@@ -48,7 +48,9 @@ async def live(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
+        print(f"[SEARCH] {query}", flush=True)
         groups = grouped_search(query)
+        print(f"[RESULT] {len(groups)} groups", flush=True)
 
         if not groups:
             await msg.edit_text(
