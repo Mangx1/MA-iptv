@@ -18,7 +18,7 @@ def allowed(update):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("[START] UPDATE MASUK | allowed =", allowed(update), flush=True)
+    print("[START] CHAT_ID =", update.effective_chat.id, "| allowed =", allowed(update), flush=True)
     if not allowed(update):
         return
 
