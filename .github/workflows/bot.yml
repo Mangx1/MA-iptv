@@ -29,4 +29,4 @@ jobs:
 
       - name: Run Bot
         run: |
-          python bot.py
+          python -u bot.py
