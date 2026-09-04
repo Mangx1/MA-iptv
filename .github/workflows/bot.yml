@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-      CHAT_ID: ${{ secrets.CHAT_ID }}
+      BOT_TOKEN: ${{ secrets.ID_BOT }}
+      CHAT_ID: ${{ secrets.ID_CHAT }}
 
     steps:
       - name: Checkout
