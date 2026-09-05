@@ -1,150 +1,61 @@
-import os
-import sys
+import logging
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, ContextTypes
+from config import BOT_TOKEN
+from core.aggregator import search_channels
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from core.aggregator import grouped_search
-from config import BOT_TOKEN, ALLOWED_CHAT_ID
-
-
-def allowed(update):
-    if not ALLOWED_CHAT_ID:
-        return True
-
-    return str(update.effective_chat.id) == str(ALLOWED_CHAT_ID)
-
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("[START] CHAT_ID =", update.effective_chat.id, "| allowed =", allowed(update), flush=True)
-    if not allowed(update):
-        return
-
     await update.message.reply_text(
-        "📺 MA-IPTV Bot\n\n"
-        "Cari channel dengan:\n"
-        "/live BBC News\n"
-        "/live CNN\n"
-        "/live sports\n\n"
-        "Bot akan mencari stream publik yang tersedia."
+        "👋 Selamat datang di Bot IPTV!\n\n"
+        "Ketik nama channel TV yang ingin kamu cari (contoh: Vidio, Indosiar, SCTV, RCTI, HBO)."
     )
 
-
-async def live(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("[LIVE] UPDATE MASUK | allowed =", allowed(update), flush=True)
-    if not allowed(update):
-        return
-
-    query = " ".join(context.args).strip()
-
+async def handle_channel_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.message.text.strip()
     if not query:
-        await update.message.reply_text(
-            "Contoh:\n/live BBC News"
+        return
+
+    status_msg = await update.message.reply_text(
+        f"🔍 Mencari stream untuk: <b>{query}</b>...", 
+        parse_mode="HTML"
+    )
+
+    results = await search_channels(query)
+
+    if not results:
+        await status_msg.edit_text(
+            f"❌ Channel <b>{query}</b> tidak ditemukan.", 
+            parse_mode="HTML"
         )
         return
 
-    msg = await update.message.reply_text(
-        f"🔎 Mencari: {query}..."
+    response = f"📺 <b>Hasil pencarian untuk '{query}':</b>\n\n"
+    for item in results[:5]:  # Mengambil 5 hasil teratas
+        name = item.get("name", "Unknown")
+        url = item.get("url", "")
+        source = item.get("source", "IPTV")
+        response += f"🔹 <b>{name}</b> (<i>{source}</i>)\n🔗 <code>{url}</code>\n\n"
+
+    await status_msg.edit_text(
+        response, 
+        parse_mode="HTML", 
+        disable_web_page_preview=True
     )
-
-    try:
-        print(f"[SEARCH] {query}", flush=True)
-        groups = grouped_search(query)
-        print(f"[RESULT] {len(groups)} groups", flush=True)
-
-        if not groups:
-            await msg.edit_text(
-                f"❌ Tidak ditemukan:\n{query}"
-            )
-            return
-
-        lines = [
-            f"📺 HASIL: {query}\n"
-        ]
-
-        buttons = []
-
-        shown = 0
-
-        for group in groups:
-            streams = group.get("streams", [])
-
-            if not streams:
-                continue
-
-            lines.append(
-                f"\n📡 {group['name']}"
-            )
-
-            for stream in streams[:3]:
-                url = stream.get("url")
-
-                if not url:
-                    continue
-
-                quality = stream.get("quality") or "?"
-                source = stream.get("source") or "?"
-                status = stream.get("status") or "unknown"
-
-                lines.append(
-                    f"  • {quality} | {source} | {status}"
-                )
-
-                buttons.append([
-                    InlineKeyboardButton(
-                        f"▶️ {group['name']} {quality}",
-                        url=url
-                    )
-                ])
-
-                shown += 1
-
-                if shown >= 12:
-                    break
-
-            if shown >= 12:
-                break
-
-        if shown == 0:
-            await msg.edit_text(
-                "❌ Tidak ada stream yang bisa ditampilkan."
-            )
-            return
-
-        keyboard = InlineKeyboardMarkup(buttons)
-
-        await msg.edit_text(
-            "\n".join(lines),
-            reply_markup=keyboard,
-            disable_web_page_preview=True
-        )
-
-    except Exception as e:
-        print("BOT ERROR:", repr(e))
-
-        await msg.edit_text(
-            f"❌ Error saat mencari.\n\n{type(e).__name__}: {e}"
-        )
-
 
 def main():
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    app.add_handler(
-        CommandHandler("start", start)
-    )
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_channel_search))
 
-    app.add_handler(
-        CommandHandler("live", live)
-    )
-
-    print("MA-IPTV BOT AKTIF")
-    print("Ketik /live BBC News di Telegram")
-
+    print("Bot IPTV berjalan...")
     app.run_polling()
-
 
 if __name__ == "__main__":
     main()
