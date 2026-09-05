@@ -1,22 +1,47 @@
 import asyncio
 import logging
 
-from providers.iptv_org import get_iptv_org_channels
-from providers.nexus import get_nexus_channels
-from providers.free_tv import get_free_tv_channels
-from providers.gnaidu import get_gnaidu_channels
-from providers.vidio import get_vidio_channels
-
 async def fetch_all_channels():
-    tasks = [
-        get_iptv_org_channels(),
-        get_nexus_channels(),
-        get_free_tv_channels(),
-        get_gnaidu_channels(),
-        get_vidio_channels()
-    ]
-    
-    # Jalankan semua provider secara bersamaan
+    tasks = []
+
+    # Provider Vidio
+    try:
+        from providers.vidio import get_vidio_channels
+        tasks.append(get_vidio_channels())
+    except ImportError as e:
+        logging.warning(f"Provider Vidio gagal dimuat: {e}")
+
+    # Provider IPTV-Org
+    try:
+        from providers.iptv_org import get_iptv_org_channels
+        tasks.append(get_iptv_org_channels())
+    except ImportError as e:
+        logging.warning(f"Provider IPTV-Org gagal dimuat: {e}")
+
+    # Provider Nexus (opsional/jika ada)
+    try:
+        from providers.nexus import get_nexus_channels
+        tasks.append(get_nexus_channels())
+    except (ImportError, AttributeError):
+        pass
+
+    # Provider Free TV (opsional/jika ada)
+    try:
+        from providers.free_tv import get_free_tv_channels
+        tasks.append(get_free_tv_channels())
+    except (ImportError, AttributeError):
+        pass
+
+    # Provider Gnaidu (opsional/jika ada)
+    try:
+        from providers.gnaidu import get_gnaidu_channels
+        tasks.append(get_gnaidu_channels())
+    except (ImportError, AttributeError):
+        pass
+
+    if not tasks:
+        return []
+
     results = await asyncio.gather(*tasks, return_exceptions=True)
     
     combined_channels = []
@@ -24,7 +49,7 @@ async def fetch_all_channels():
         if isinstance(res, list):
             combined_channels.extend(res)
         elif isinstance(res, Exception):
-            logging.error(f"Error pada salah satu provider: {res}")
+            logging.error(f"Error pada task provider: {res}")
             
     return combined_channels
 
